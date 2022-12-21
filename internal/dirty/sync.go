@@ -1,7 +1,7 @@
 package dirty
 
 import (
-	"ddd/path-sync/internal/pkg/crypto"
+	"ddd/internal/pkg/crypto"
 	"io/ioutil"
 	"os"
 )

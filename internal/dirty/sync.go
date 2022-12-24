@@ -8,7 +8,7 @@ import (
 
 const filePerm = 0644
 
-func sync(source string, dest string) error {
+func Sync(source string, dest string) error {
 	// Обойти исходную папку и создать словарь имен и их хешей
 
 	sourceHashes := map[string]string{}

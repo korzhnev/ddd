@@ -2,52 +2,56 @@ package clear
 
 import (
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
+	"os"
 	"testing"
 )
 
-func TestWhenAFileExistsInTheSourceButNotTheDestination(t *testing.T) {
-	source := "/source"
-	dest := "/dest"
-	filename := "my-file"
-	filesystem := NewFakeFileSystem()
+func Test_WhenAFileExistsInTheSourceButNotTheDestination(t *testing.T) {
+	source, err := os.MkdirTemp("", "source")
+	assert.NoError(t, err)
 
-	reader := func(path string) (map[string]string, error) {
-		state := map[string]map[string]string{
-			source: {
-				"hash1": filename,
-			},
-			dest: {},
-		}
-		return state[path], nil
-	}
+	dest, err := os.MkdirTemp("", "dest")
+	assert.NoError(t, err)
 
-	sync(reader, filesystem, source, dest)
+	content := "I am really useful file"
+	err = ioutil.WriteFile(getPath(source, "my-file"), []byte(content), filePerm)
+	assert.NoError(t, err)
 
-	assert.Equal(t, [][]string{{copyOperation, getPath(source, filename), getPath(dest, filename)}}, filesystem.Operations)
+	Sync(source, dest)
+
+	expectedPath := getPath(dest, "/my-file")
+	assert.FileExists(t, expectedPath)
+	fileContent, err := ioutil.ReadFile(expectedPath)
+	assert.NoError(t, err)
+	assert.Equal(t, content, string(fileContent))
 }
 
-func TestWhenAFileHasBeenRenamedInTheSource(t *testing.T) {
-	source := "/source"
-	dest := "/dest"
-	filesystem := NewFakeFileSystem()
+func Test_WhenAFileHasBeenRenamedInTheSource(t *testing.T) {
+	source, err := os.MkdirTemp("", "source")
+	assert.NoError(t, err)
 
-	reader := func(path string) (map[string]string, error) {
-		state := map[string]map[string]string{
-			source: {
-				"hash1": "renamed-file",
-			},
-			dest: {
-				"hash1": "original-file",
-			},
-		}
-		return state[path], nil
-	}
+	dest, err := os.MkdirTemp("", "dest")
+	assert.NoError(t, err)
 
-	sync(reader, filesystem, source, dest)
+	content := "I am a file, which has been renamed"
 
-	assert.Equal(
-		t,
-		[][]string{{moveOperation, getPath(dest, "original-file"), getPath(dest, "renamed-file")}},
-		filesystem.Operations,
-	)
+	sourcePath := getPath(source, "source-filename")
+	oldDestPath := getPath(dest, "dest-filename")
+
+	expectedDestPath := getPath(dest, "source-filename")
+
+	err = ioutil.WriteFile(sourcePath, []byte(content), filePerm)
+	assert.NoError(t, err)
+
+	err = ioutil.WriteFile(oldDestPath, []byte(content), filePerm)
+	assert.NoError(t, err)
+
+	Sync(source, dest)
+
+	assert.NoFileExists(t, oldDestPath)
+
+	fileContent, err := ioutil.ReadFile(expectedDestPath)
+	assert.NoError(t, err)
+	assert.Equal(t, content, string(fileContent))
 }

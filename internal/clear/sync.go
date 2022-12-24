@@ -1,53 +1,66 @@
 package clear
 
-type Filesystem interface {
-	Copy(from string, to string) error
-	Move(from string, to string) error
-	Delete(path string) error
-}
+import (
+	"ddd/internal/pkg/crypto"
+	"io/ioutil"
+	"os"
+)
 
-func sync(
-	reader func(path string) (map[string]string, error),
-	filesystem Filesystem,
-	source string,
-	dest string,
-) error {
-	sourceHashes, err := reader(source)
+const filePerm = 0644
+
+func Sync(source string, dest string) error {
+	sourceHashes, err := readPathsAndHashes(source)
 	if err != nil {
 		return err
 	}
-	destHashes, err := reader(dest)
+	destHashes, err := readPathsAndHashes(dest)
 	if err != nil {
 		return err
 	}
 
-	for sha, filename := range sourceHashes {
-		if _, ok := destHashes[sha]; !ok {
-			sourcePath := getPath(source, filename)
-			destPath := getPath(dest, filename)
-			if err := filesystem.Copy(sourcePath, destPath); err != nil {
+	actions := determineActions(sourceHashes, destHashes, source, dest)
+	for _, action := range actions {
+		switch action.Type {
+		case copyAction:
+			input, err := ioutil.ReadFile(action.Paths[0])
+			if err != nil {
 				return err
 			}
-		} else if destHashes[sha] != filename {
-			oldDestPath := getPath(dest, destHashes[sha])
-			newDestPath := getPath(dest, filename)
-			if err := filesystem.Move(oldDestPath, newDestPath); err != nil {
+			if err = ioutil.WriteFile(action.Paths[1], input, filePerm); err != nil {
+				return err
+			}
+		case moveAction:
+			if err = os.Rename(action.Paths[0], action.Paths[1]); err != nil {
+				return err
+			}
+		case deleteAction:
+			if err = os.Remove(action.Paths[0]); err != nil {
 				return err
 			}
 		}
 	}
-
-	for sha, filename := range destHashes {
-		if _, ok := sourceHashes[sha]; !ok {
-			if err := filesystem.Delete(getPath(dest, filename)); err != nil {
-				return err
-			}
-		}
-	}
-
 	return nil
 }
 
-func getPath(dir string, file string) string {
-	return dir + "/" + file
+func readPathsAndHashes(path string) (result map[string]string, err error) {
+	result = map[string]string{}
+
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		var hash string
+		hash, err = crypto.HashFile(getPath(path, file.Name()))
+		if err != nil {
+			return
+		}
+		result[hash] = file.Name()
+	}
+
+	return
 }

@@ -18,7 +18,7 @@ func TestWhenAFileExistsInTheSourceButNotTheDestination(t *testing.T) {
 	err = ioutil.WriteFile(getPath(source, "my-file"), []byte(content), filePerm)
 	assert.NoError(t, err)
 
-	sync(source, dest)
+	Sync(source, dest)
 
 	expectedPath := getPath(dest, "/my-file")
 	assert.FileExists(t, expectedPath)
@@ -47,7 +47,7 @@ func TestWhenAFileHasBeenRenamedInTheSource(t *testing.T) {
 	err = ioutil.WriteFile(oldDestPath, []byte(content), filePerm)
 	assert.NoError(t, err)
 
-	sync(source, dest)
+	Sync(source, dest)
 
 	assert.NoFileExists(t, oldDestPath)
 
